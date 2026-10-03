@@ -183,7 +183,8 @@ setupDrop('drop-frida', 'input-frida', async (file) => {
       throw new Error('Unsupported file type. Use symbolmap.json or libil2cpp.so');
     }
 
-    const output = configBlock + '\n' + bridgeSrc;
+    // Config block MUST come after bridge source — Il2Cpp doesn't exist before that
+    const output = bridgeSrc + '\n\n' + configBlock;
 
     document.getElementById('output-frida').value = output;
     document.getElementById('frida-count').textContent = `${count} symbols — ${(output.length / 1024).toFixed(1)} KB`;
@@ -197,36 +198,41 @@ setupDrop('drop-frida', 'input-frida', async (file) => {
 
 function buildConfigBlockFromEntries(entries, filename) {
   const lines = [
-    '// frida-il2cpp-bridge — configured by Killa\'s Toolkit',
-    `// source: ${filename}`,
-    `// symbols: ${entries.length}`,
+    '// ─────────────────────────────────────────────────────────',
+    '// configured by Killa\'s Toolkit',
+    `// source: ${filename} — ${entries.length} symbols`,
     '// usage:  frida -U -f <package> -l frida-il2cpp-bridge.js --no-pause',
-    '//',
-    '// Il2Cpp.$config is read by the bridge at runtime.',
-    '// Adjust moduleName if your target uses a different .so name.',
+    '// ─────────────────────────────────────────────────────────',
     '',
-    'Il2Cpp.$config = {',
-    '  moduleName: "libil2cpp.so",',
-    '  unityVersion: undefined, // set manually if auto-detect fails e.g. "2022.3.5f1"',
-    '  exports: {',
+    '// Il2Cpp is now defined — safe to configure',
+    'Il2Cpp.$config.moduleName = "libil2cpp.so";',
+    '// Il2Cpp.$config.unityVersion = "2022.3.5f1"; // uncomment and set if auto-detect fails',
+    '',
+    '// Extracted symbol map:',
+    'var symbolMap = {',
   ];
 
-  // Map common il2cpp export names from symbolmap
-  for (const e of entries.slice(0, 200)) {
+  for (const e of entries) {
     const name   = e.name || e.methodName || e.symbol || '';
     const offset = e.offset || e.rva || e.address || 0;
     if (!name) continue;
-    const hexOff = typeof offset === 'number' ? `0x${offset.toString(16).padStart(8,'0')}` : `"${offset}"`;
-    lines.push(`    // ${name}: ${hexOff},`);
+    const hexOff = typeof offset === 'number' ? `0x${offset.toString(16).padStart(8,'0')}` : String(offset);
+    lines.push(`  "${name}": ptr(Module.getBaseAddress("libil2cpp.so")).add(${hexOff}),`);
   }
 
-  lines.push('  }');
-  lines.push('};');
+  lines.push('};', '');
+  lines.push('Il2Cpp.perform(() => {');
+  lines.push('  console.log("[*] il2cpp loaded — version: " + Il2Cpp.unityVersion);');
+  lines.push('  console.log("[*] " + Object.keys(symbolMap).length + " symbols mapped");');
   lines.push('');
-  lines.push('// ─────────────────────────────────────────────────');
-  lines.push('// frida-il2cpp-bridge source follows');
-  lines.push('// ─────────────────────────────────────────────────');
-  lines.push('');
+  lines.push('  // Hook example — replace with your target method name:');
+  lines.push('  // var target = symbolMap["YourMethodName"];');
+  lines.push('  // if (target) {');
+  lines.push('  //   Interceptor.attach(target, {');
+  lines.push('  //     onEnter(args) { console.log("[+] hooked!"); }');
+  lines.push('  //   });');
+  lines.push('  // }');
+  lines.push('});');
 
   return lines.join('\n');
 }
@@ -237,30 +243,37 @@ function buildConfigBlockFromSymbols(symbols, filename) {
   );
 
   const lines = [
-    '// frida-il2cpp-bridge — configured by Killa\'s Toolkit',
+    '// ─────────────────────────────────────────────────────────',
+    '// configured by Killa\'s Toolkit',
     `// source: ${filename}`,
-    `// il2cpp exports found: ${il2cppExports.length} / ${symbols.length} total`,
+    `// il2cpp exports: ${il2cppExports.length} / ${symbols.length} total`,
     '// usage:  frida -U -f <package> -l frida-il2cpp-bridge.js --no-pause',
+    '// ─────────────────────────────────────────────────────────',
     '',
-    'Il2Cpp.$config = {',
-    '  moduleName: "libil2cpp.so",',
-    '  unityVersion: undefined,',
-    '  exports: {',
+    '// Il2Cpp is now defined — safe to configure',
+    'Il2Cpp.$config.moduleName = "libil2cpp.so";',
+    '// Il2Cpp.$config.unityVersion = "2022.3.5f1"; // uncomment and set if auto-detect fails',
+    '',
   ];
 
-  for (const s of il2cppExports) {
-    const hex  = `0x${s.addr.toString(16).padStart(8,'0')}`;
-    const safe = s.name.replace(/^il2cpp_/, '').replace(/[^a-zA-Z0-9_]/g, '_');
-    lines.push(`    ${safe}: ptr("${hex}"), // ${s.name}`);
+  // Wire known il2cpp exports into $config.exports
+  if (il2cppExports.length > 0) {
+    lines.push('Il2Cpp.$config.exports = {');
+    for (const s of il2cppExports) {
+      const hex  = `0x${s.addr.toString(16).padStart(8, '0')}`;
+      const safe = s.name.replace(/^il2cpp_/, '').replace(/[^a-zA-Z0-9_]/g, '_');
+      lines.push(`  ${safe}: () => ptr("${hex}"), // ${s.name}`);
+    }
+    lines.push('};', '');
   }
 
-  lines.push('  }');
-  lines.push('};');
+  lines.push('Il2Cpp.perform(() => {');
+  lines.push('  console.log("[*] il2cpp loaded — version: " + Il2Cpp.unityVersion);');
+  lines.push('  console.log("[*] module base: " + Il2Cpp.module.base);');
   lines.push('');
-  lines.push('// ─────────────────────────────────────────────────');
-  lines.push('// frida-il2cpp-bridge source follows');
-  lines.push('// ─────────────────────────────────────────────────');
-  lines.push('');
+  lines.push('  // Example — hook il2cpp_runtime_invoke to trace all managed calls:');
+  lines.push('  // Il2Cpp.trace(Il2Cpp.domain.assemblies[0].image);');
+  lines.push('});');
 
   return lines.join('\n');
 }
