@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Killa's Toolkit</title>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <span class="logo-bracket">[</span>
+        <span class="logo-text">KILLA</span>
+        <span class="logo-bracket">]</span>
+        <span class="logo-sub">// il2cpp toolkit</span>
+      </div>
+      <div class="header-line"></div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="symbol">symbol extractor</button>
+      <button class="tab" data-tab="metadata">metadata dumper</button>
+      <button class="tab" data-tab="frida">frida bridge extractor</button>
+      <button class="tab" data-tab="obfuscator">js obfuscator</button>
+    </nav>
+
+    <main class="panels">
+
+      <!-- SYMBOL EXTRACTOR -->
+      <section class="panel active" id="panel-symbol">
+        <div class="panel-header">
+          <h2>il2cpp <span class="accent">symbol extractor</span></h2>
+          <p class="panel-desc">drop your <code>libil2cpp.so</code> or <code>.apk</code> — symbols pulled client-side.</p>
+        </div>
+        <div class="drop-zone" id="drop-symbol">
+          <div class="drop-inner">
+            <div class="drop-icon">⬇</div>
+            <span>drop libil2cpp.so or .apk here</span>
+            <span class="drop-or">or <label class="file-label" for="input-symbol">browse files</label></span>
+          </div>
+          <input type="file" id="input-symbol" accept=".so,.apk" hidden/>
+        </div>
+        <div class="options-row">
+          <label class="toggle-label">
+            <input type="checkbox" id="sym-filter-il2cpp" checked/>
+            <span class="toggle-box"></span>
+            il2cpp symbols only
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="sym-show-addr" checked/>
+            <span class="toggle-box"></span>
+            show addresses
+          </label>
+        </div>
+        <div class="output-wrap hidden" id="output-symbol-wrap">
+          <div class="output-toolbar">
+            <span class="output-count" id="sym-count"></span>
+            <button class="btn-copy" id="btn-copy-symbol">copy</button>
+            <button class="btn-download" id="btn-dl-symbol">download</button>
+          </div>
+          <textarea class="output-box" id="output-symbol" readonly></textarea>
+        </div>
+        <div class="status-bar" id="status-symbol"></div>
+      </section>
+
+      <!-- METADATA DUMPER -->
+      <section class="panel" id="panel-metadata">
+        <div class="panel-header">
+          <h2>il2cpp <span class="accent">metadata dumper</span></h2>
+          <p class="panel-desc">drop your <code>global-metadata.dat</code> or <code>.apk</code> to extract frida, bnm, or dump.cs.</p>
+        </div>
+        <div class="select-row">
+          <label class="select-label">dump format</label>
+          <select class="styled-select" id="meta-format">
+            <option value="frida">frida script</option>
+            <option value="bnm">bnm offsets</option>
+            <option value="cs">dump.cs</option>
+          </select>
+        </div>
+        <div class="drop-zone" id="drop-metadata">
+          <div class="drop-inner">
+            <div class="drop-icon">⬇</div>
+            <span>drop global-metadata.dat or .apk here</span>
+            <span class="drop-or">or <label class="file-label" for="input-metadata">browse files</label></span>
+          </div>
+          <input type="file" id="input-metadata" accept=".dat,.apk" hidden/>
+        </div>
+        <div class="output-wrap hidden" id="output-metadata-wrap">
+          <div class="output-toolbar">
+            <span class="output-count" id="meta-count"></span>
+            <button class="btn-copy" id="btn-copy-meta">copy</button>
+            <button class="btn-download" id="btn-dl-meta">download</button>
+          </div>
+          <textarea class="output-box" id="output-metadata" readonly></textarea>
+        </div>
+        <div class="status-bar" id="status-metadata"></div>
+      </section>
+
+      <!-- FRIDA BRIDGE EXTRACTOR -->
+      <section class="panel" id="panel-frida">
+        <div class="panel-header">
+          <h2>frida <span class="accent">bridge extractor</span></h2>
+          <p class="panel-desc">drop your <code>symbolmap.json</code> or <code>libil2cpp.so</code> — outputs a <code>frida-il2cpp-bridge.js</code> script.</p>
+        </div>
+        <div class="drop-zone" id="drop-frida">
+          <div class="drop-inner">
+            <div class="drop-icon">⬇</div>
+            <span>drop symbolmap.json or libil2cpp.so here</span>
+            <span class="drop-or">or <label class="file-label" for="input-frida">browse files</label></span>
+          </div>
+          <input type="file" id="input-frida" accept=".json,.so" hidden/>
+        </div>
+        <div class="output-wrap hidden" id="output-frida-wrap">
+          <div class="output-toolbar">
+            <span class="output-count" id="frida-count"></span>
+            <button class="btn-copy" id="btn-copy-frida">copy</button>
+            <button class="btn-download" id="btn-dl-frida">download</button>
+          </div>
+          <textarea class="output-box" id="output-frida" readonly></textarea>
+        </div>
+        <div class="status-bar" id="status-frida"></div>
+      </section>
+
+      <!-- JS OBFUSCATOR -->
+      <section class="panel" id="panel-obfuscator">
+        <div class="panel-header">
+          <h2>javascript <span class="accent">obfuscator</span></h2>
+          <p class="panel-desc">encrypts your js using xor + base64, packed into a self-executing decoder payload.</p>
+        </div>
+        <div class="input-group">
+          <label class="input-label">javascript code</label>
+          <textarea class="code-input" id="js-input" placeholder="// paste your javascript here..."></textarea>
+        </div>
+        <button class="btn-primary" id="btn-obfuscate">obfuscate code</button>
+        <div class="output-wrap hidden" id="output-obf-wrap">
+          <div class="output-toolbar">
+            <button class="btn-copy" id="btn-copy-obf">copy</button>
+            <button class="btn-download" id="btn-dl-obf">download</button>
+          </div>
+          <textarea class="output-box" id="output-obf" readonly></textarea>
+        </div>
+        <div class="status-bar" id="status-obf"></div>
+      </section>
+
+    </main>
+  </div>
+  <script src="js/elf.js"></script>
+  <script src="js/metadata.js"></script>
+  <script src="js/obfuscator.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
